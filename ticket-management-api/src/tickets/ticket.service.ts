@@ -9,6 +9,7 @@ import { Ticket } from '../entities/ticket.entity';
 import { TicketStatus } from '../entities/enums/ticket.enums';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { TopicService } from '../topics/topic.service';
 
 export interface FindAllFilters {
   status?: TicketStatus;
@@ -22,25 +23,64 @@ export class TicketService {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+    private readonly topicService: TopicService,
   ) {}
+
+  /**
+   * Get topic name for a ticket
+   * Returns topic.name if topic exists, otherwise topicNameSnapshot
+   */
+  private getTopicName(ticket: Ticket): string | null {
+    if (ticket.topic) {
+      return ticket.topic.name;
+    }
+    return ticket.topicNameSnapshot;
+  }
+
+  /**
+   * Enrich ticket with topicName field for API responses
+   */
+  private enrichTicketWithTopicName(ticket: Ticket): any {
+    const ticketObj = ticket as any;
+    ticketObj.topicName = this.getTopicName(ticket);
+    return ticketObj;
+  }
 
   /**
    * Create a new ticket
    * Business Rule: Tickets always start with status "created"
    */
   async createTicket(createTicketDto: CreateTicketDto): Promise<Ticket> {
+    // Validate that the topic exists and is active
+    const topic = await this.topicService.findActiveById(createTicketDto.topic_id);
+    if (!topic) {
+      throw new BadRequestException(
+        `Topic with ID ${createTicketDto.topic_id} not found or is not active`,
+      );
+    }
+
     try {
       const ticket = this.ticketRepository.create({
         requesterId: createTicketDto.requester_id,
         requesterName: createTicketDto.requester_name || null,
         assigneeId: createTicketDto.assignee_id ?? null,
-        topic: createTicketDto.topic,
+        topicId: createTicketDto.topic_id,
+        topicNameSnapshot: topic.name, // Persist topic name at creation time
         priority: createTicketDto.priority,
         description: createTicketDto.description,
         status: TicketStatus.CREATED, // Always start with "created"
       });
 
-      return await this.ticketRepository.save(ticket);
+      const savedTicket = await this.ticketRepository.save(ticket);
+      
+      // Load topic relation for response
+      const ticketWithTopic = await this.ticketRepository.findOne({
+        where: { ticketId: savedTicket.ticketId },
+        relations: ['topic'],
+      }) || savedTicket;
+
+      // Enrich with topicName for API response
+      return this.enrichTicketWithTopicName(ticketWithTopic);
     } catch (error) {
       // Log the error for debugging
       console.error('Error creating ticket:', error);
@@ -60,7 +100,8 @@ export class TicketService {
    * Find all tickets with optional filters
    */
   async findAll(filters?: FindAllFilters): Promise<Ticket[]> {
-    const queryBuilder = this.ticketRepository.createQueryBuilder('ticket');
+    const queryBuilder = this.ticketRepository.createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.topic', 'topic');
 
     if (filters?.status) {
       queryBuilder.andWhere('ticket.status = :status', {
@@ -86,7 +127,10 @@ export class TicketService {
       });
     }
 
-    return await queryBuilder.getMany();
+    const tickets = await queryBuilder.getMany();
+    
+    // Enrich all tickets with topicName
+    return tickets.map(ticket => this.enrichTicketWithTopicName(ticket));
   }
 
   /**
@@ -95,13 +139,15 @@ export class TicketService {
   async findById(id: number): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { ticketId: id },
+      relations: ['topic'],
     });
 
     if (!ticket) {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
 
-    return ticket;
+    // Enrich with topicName for API response
+    return this.enrichTicketWithTopicName(ticket);
   }
 
   /**
@@ -156,7 +202,15 @@ export class TicketService {
    * Update ticket (assign user or change status)
    */
   async updateTicket(id: number, updateTicketDto: UpdateTicketDto): Promise<Ticket> {
-    const ticket = await this.findById(id);
+    // Get ticket without enrichment first (to avoid double enrichment)
+    const ticket = await this.ticketRepository.findOne({
+      where: { ticketId: id },
+      relations: ['topic'],
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket with ID ${id} not found`);
+    }
 
     // Handle assignee update
     if (updateTicketDto.assignee_id !== undefined) {
@@ -173,14 +227,31 @@ export class TicketService {
       ticket.status = updateTicketDto.status;
     }
 
-    return await this.ticketRepository.save(ticket);
+    const savedTicket = await this.ticketRepository.save(ticket);
+    
+    // Reload with topic relation
+    const ticketWithTopic = await this.ticketRepository.findOne({
+      where: { ticketId: savedTicket.ticketId },
+      relations: ['topic'],
+    }) || savedTicket;
+
+    // Enrich with topicName for API response
+    return this.enrichTicketWithTopicName(ticketWithTopic);
   }
 
   /**
    * Finalize ticket (set status to completed)
    */
   async finalizeTicket(id: number): Promise<Ticket> {
-    const ticket = await this.findById(id);
+    // Get ticket without enrichment first (to avoid double enrichment)
+    const ticket = await this.ticketRepository.findOne({
+      where: { ticketId: id },
+      relations: ['topic'],
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket with ID ${id} not found`);
+    }
 
     // Validate that ticket can be finalized
     if (ticket.status === TicketStatus.COMPLETED) {
@@ -194,7 +265,16 @@ export class TicketService {
     }
 
     ticket.status = TicketStatus.COMPLETED;
-    return await this.ticketRepository.save(ticket);
+    const savedTicket = await this.ticketRepository.save(ticket);
+    
+    // Reload with topic relation
+    const ticketWithTopic = await this.ticketRepository.findOne({
+      where: { ticketId: savedTicket.ticketId },
+      relations: ['topic'],
+    }) || savedTicket;
+
+    // Enrich with topicName for API response
+    return this.enrichTicketWithTopicName(ticketWithTopic);
   }
 }
 

@@ -8,7 +8,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TicketTopic, TicketPriority } from '../../entities/enums/ticket.enums';
+import { TicketPriority } from '../../entities/enums/ticket.enums';
 
 export class CreateTicketDto {
   @ApiProperty({
@@ -41,12 +41,14 @@ export class CreateTicketDto {
   assignee_id?: number;
 
   @ApiProperty({
-    description: 'Topic category of the ticket',
-    enum: TicketTopic,
-    example: TicketTopic.BUG,
+    description: 'ID of the topic category for the ticket',
+    example: 1,
+    minimum: 1,
   })
-  @IsEnum(TicketTopic)
-  topic: TicketTopic;
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  topic_id: number;
 
   @ApiProperty({
     description: 'Priority level of the ticket',

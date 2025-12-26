@@ -166,7 +166,12 @@ export function TicketDetailModal({ ticketId, open, onOpenChange, onTicketUpdate
             {/* Topic */}
             <div>
               <label className="text-sm font-medium text-muted-foreground block mb-1">Topic</label>
-              <p className="text-base">{ticket.topic?.name || "N/A"}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-base">{ticket.topic?.name || "N/A"}</p>
+                {(!ticket.topic || !ticket.topic.active || !ticket.topicId) && (
+                  <span className="text-xs text-muted-foreground italic">(Archived)</span>
+                )}
+              </div>
             </div>
 
             {/* Assignee */}

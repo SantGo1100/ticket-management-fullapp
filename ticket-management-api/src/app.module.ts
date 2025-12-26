@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmConfigService } from './config/typeorm.config';
 import { TicketModule } from './tickets/ticket.module';
+import { TopicModule } from './topics/topic.module';
 import { AuthModule } from './auth/auth.module';
 
 @Module({
@@ -20,6 +21,8 @@ import { AuthModule } from './auth/auth.module';
     }),
     // Auth module (global guard is registered here)
     AuthModule,
+    // Topic module
+    TopicModule,
     // Ticket module
     TicketModule,
   ],

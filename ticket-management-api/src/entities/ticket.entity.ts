@@ -4,8 +4,11 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
-import { TicketTopic, TicketPriority, TicketStatus } from './enums/ticket.enums';
+import { TicketPriority, TicketStatus } from './enums/ticket.enums';
+import { Topic } from './topic.entity';
 
 @Entity('tickets')
 export class Ticket {
@@ -21,12 +24,15 @@ export class Ticket {
   @Column({ name: 'assignee_id', type: 'integer', nullable: true })
   assigneeId: number | null;
 
-  @Column({
-    type: 'varchar',
-    length: 20,
-    enum: TicketTopic,
-  })
-  topic: TicketTopic;
+  @Column({ name: 'topic_id', type: 'integer', nullable: true })
+  topicId: number | null;
+
+  @ManyToOne(() => Topic, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'topic_id' })
+  topic: Topic | null;
+
+  @Column({ name: 'topic_name_snapshot', type: 'varchar', length: 100, nullable: true })
+  topicNameSnapshot: string | null;
 
   @Column({
     type: 'varchar',
