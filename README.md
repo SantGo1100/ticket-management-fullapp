@@ -92,6 +92,7 @@ For detailed setup instructions, environment configuration, and integration deta
 
 ## 📚 Documentation
 
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Railway (backend) and Vercel (frontend)
 - **[INTEGRATION_SETUP.md](./INTEGRATION_SETUP.md)** - Complete setup guide, environment configuration, and troubleshooting
 - **[ticket-management-api/README.md](./ticket-management-api/README.md)** - Backend API documentation, architecture, and endpoints
 - **[v0-uix-ticket-qf/README.md](./v0-uix-ticket-qf/README.md)** - Frontend application details

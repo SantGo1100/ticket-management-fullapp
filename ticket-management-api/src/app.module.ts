@@ -10,10 +10,10 @@ import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
-    // Global configuration module - loads .env file
+    // Global configuration module - loads .env file (only in development)
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: process.env.NODE_ENV === 'production' ? undefined : '.env',
     }),
     // TypeORM module with async configuration
     TypeOrmModule.forRootAsync({

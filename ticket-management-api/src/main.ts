@@ -8,8 +8,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   // Enable CORS for frontend integration
+  // Support multiple origins (local development and production)
+  const frontendUrls = process.env.FRONTEND_URL 
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    : ['http://localhost:3001'];
+  
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: frontendUrls,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-account-sid', 'x-api-key'],
@@ -59,11 +64,11 @@ async function bootstrap() {
     });
   }
 
-  // Get port from environment or use default
+  // Get port from environment (Railway provides PORT)
   const port = process.env.PORT || 3000;
   
-  await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  await app.listen(port, '0.0.0.0'); // Listen on all interfaces for Railway
+  console.log(`Application is running on port ${port}`);
   
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Swagger documentation available at: http://localhost:${port}/api/docs`);
