@@ -15,12 +15,21 @@ export class AuthService {
   ) {}
 
   async validateAccountAndApiKey(sid: string, apiKey: string): Promise<Account> {
+    // Normalize SID (trim and ensure consistent format)
+    const normalizedSid = sid.trim();
+    
     // Find account by SID
     const account = await this.accountRepository.findOne({
-      where: { sid },
+      where: { sid: normalizedSid },
     });
 
     if (!account) {
+      // Log available accounts in development for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        const allAccounts = await this.accountRepository.find();
+        console.log(`[Auth] Account not found. Looking for SID: "${normalizedSid}"`);
+        console.log(`[Auth] Available accounts:`, allAccounts.map(a => a.sid));
+      }
       throw new UnauthorizedException('Invalid account SID');
     }
 
