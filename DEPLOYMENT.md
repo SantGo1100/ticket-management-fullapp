@@ -46,7 +46,9 @@ This guide covers deploying the Ticket Management application to Railway (backen
 1. In your Railway project, click **"+ New"**
 2. Select **"Database"** → **"Add PostgreSQL"**
 3. Railway will automatically create a PostgreSQL database
-4. The `DATABASE_URL` environment variable will be automatically set
+4. **Wait 1-2 minutes** for the database to fully initialize (status should be green)
+5. The `DATABASE_URL` environment variable will be automatically set and linked to your app service
+6. **Important:** Ensure both your app service and PostgreSQL service are in the same Railway project
 
 ### Step 3: Configure Environment Variables
 
@@ -61,7 +63,10 @@ DB_SSL=true
 DB_LOGGING=false
 ```
 
-**Note:** Replace `https://your-frontend-app.vercel.app` with your actual Vercel deployment URL (you'll get this after deploying the frontend).
+**Note:** 
+- Replace `https://your-frontend-app.vercel.app` with your actual Vercel **production domain** (not preview URLs)
+- You'll get this URL after deploying the frontend (Step 3 of Frontend Deployment)
+- The production domain is typically `https://{project-name}.vercel.app` (without the hash suffix)
 
 ### Step 4: Configure Build Settings
 
@@ -80,29 +85,60 @@ Railway will automatically detect the build settings from `railway.json`, but ve
 3. Wait for the build to complete
 4. Copy your Railway deployment URL (e.g., `https://your-api.up.railway.app`)
 
-### Step 6: Run Database Migrations
+### Step 6: Verify Database Connection
 
-After the first deployment, run the topic migration:
+Before seeding, verify the database connection works:
 
-1. Go to Railway project → **"Deployments"**
-2. Click on the latest deployment
-3. Open the **"Logs"** tab
-4. Or use Railway CLI:
-   ```bash
-   railway run npm run migrate:topics
-   ```
+```bash
+railway run npm run check:db
+```
 
-### Step 7: Seed Test Account (Optional)
+This will show:
+- Whether `DATABASE_URL` is set
+- Database connection details
+- Connection test results
 
-To create a test account:
+**If you see connection errors:**
+1. Ensure PostgreSQL service is running (green status in Railway)
+2. Verify services are linked (both in same project)
+3. Check Railway variables for `DATABASE_URL`
+
+### Step 7: Seed Test Account (REQUIRED)
+
+**⚠️ IMPORTANT:** You MUST seed an account before the frontend can authenticate. This is not optional.
+
+To create a test account, use Railway CLI:
 
 ```bash
 railway run npm run seed:account
 ```
 
+**Troubleshooting:** If you get database connection errors:
+1. First run: `railway run npm run check:db` to diagnose
+2. Ensure PostgreSQL service is running and linked
+3. Wait a few minutes after creating the database for it to be fully ready
+
+Or via Railway Dashboard:
+1. Go to Railway project → **"Deployments"**
+2. Click on the latest deployment
+3. Open the **"Logs"** tab
+4. Or use the **"Shell"** option to run commands
+
 This creates:
 - Account SID: `AC123456789`
 - API Key: `sk_live_abc123xyz456`
+
+**Note:** These credentials must match the environment variables you set in Vercel.
+
+### Step 8: Run Database Migrations
+
+After seeding the account, run the topic migration:
+
+```bash
+railway run npm run migrate:topics
+```
+
+This ensures all existing tickets have `topicNameSnapshot` populated.
 
 ## ▲ Frontend Deployment (Vercel)
 
@@ -149,6 +185,14 @@ After getting your Vercel URL, update the backend CORS:
    ```
 3. Railway will automatically redeploy with the new CORS settings
 
+**⚠️ Important - Vercel URL Types:**
+- Vercel provides multiple URLs:
+  - **Production domain**: `https://your-app.vercel.app` (your custom/production URL)
+  - **Preview URLs**: `https://your-app-{hash}.vercel.app` (deployment-specific)
+- **Always use the production domain** in `FRONTEND_URL` (the one users access)
+- The `Origin` header from the browser must match `FRONTEND_URL` exactly
+- Check your browser's Network tab to see the exact `Origin` header being sent
+
 ## ✅ Verification
 
 ### Test Backend
@@ -164,19 +208,62 @@ After getting your Vercel URL, update the backend CORS:
 
 ### Common Issues
 
-**CORS Errors:**
-- Ensure `FRONTEND_URL` in Railway matches your Vercel URL exactly
-- Check for trailing slashes
-- Verify the URL includes `https://`
+**401 Unauthorized - "Invalid account SID":**
+- **Most Common Cause:** Account not seeded in production database
+- **Solution:** Run `railway run npm run seed:account` in your Railway project
+- **Verify Account Exists:** Run `railway run npm run check:account` to see all accounts in the database
+- **Verify Credentials Match:** Check that the Account SID and API Key in Vercel environment variables match the seeded values exactly (no extra spaces)
+- **Debug:** Check Railway logs to see what SID is being received (development mode only)
+- **Note:** Each environment (production, staging) needs its own account seeded
+- **Quick Fix:** If using default credentials, ensure Vercel has:
+  - `NEXT_PUBLIC_API_ACCOUNT_SID=AC123456789` (no spaces)
+  - `NEXT_PUBLIC_API_KEY=sk_live_abc123xyz456` (no spaces)
 
-**Database Connection Errors:**
-- Verify `DATABASE_URL` is set (Railway sets this automatically)
-- Check `DB_SSL=true` is set
-- Ensure database is provisioned and running
+**CORS Errors (Missing Allow Origin):**
+- **Most Common Cause:** `FRONTEND_URL` in Railway doesn't match the `Origin` header from the browser
+- **Solution:** 
+  1. Check the browser's Network tab → find the OPTIONS request → check the `Origin` header value
+  2. Update `FRONTEND_URL` in Railway to match that exact value
+  3. Common issues:
+     - Using Vercel preview URL (`https://app-{hash}.vercel.app`) instead of production domain (`https://app.vercel.app`)
+     - Trailing slash mismatch: `https://app.vercel.app/` vs `https://app.vercel.app`
+     - Protocol mismatch: `http://` instead of `https://`
+- **Multiple origins:** Use comma-separated values: `https://app1.vercel.app,https://app2.vercel.app`
+- **After updating:** Railway will auto-redeploy; wait for deployment to complete before testing
+
+**Database Connection Errors (getaddrinfo ENOTFOUND postgres.railway.internal):**
+- **Cause:** TypeORM trying to connect but DATABASE_URL might not be set correctly or database isn't linked
+- **Diagnosis:** Run `railway run npm run check:db` to diagnose the issue
+- **Solution 1:** Verify DATABASE_URL is set in Railway:
+  1. Go to Railway project → **"Variables"** tab
+  2. Look for `DATABASE_URL` (should be auto-set by Railway when you add PostgreSQL)
+  3. If missing, check that PostgreSQL service is linked to your app service
+- **Solution 2:** Link database to your service:
+  1. In Railway project, ensure PostgreSQL service is added
+  2. Click on your app service → **"Settings"** → **"Variables"**
+  3. Verify `DATABASE_URL` appears (Railway auto-injects it when services are linked)
+  4. If not linked: Click on PostgreSQL service → **"Settings"** → **"Generate Domain"** (if needed)
+  5. Then in your app service, Railway should auto-inject `DATABASE_URL`
+- **Solution 3:** Manually set DATABASE_URL (if auto-injection fails):
+  1. Go to PostgreSQL service → **"Connect"** tab
+  2. Copy the **"Connection URL"** (starts with `postgresql://`)
+  3. Go to your app service → **"Variables"** tab
+  4. Add `DATABASE_URL` with the copied connection URL
+- **Solution 4:** Ensure services are in the same project:
+  - Both your app service and PostgreSQL service must be in the same Railway project
+  - Railway only auto-injects `DATABASE_URL` when services are in the same project
+- **For Scripts:** When running `railway run`, ensure you're in the correct project context:
+  ```bash
+  # Make sure you're in the right project
+  railway link  # Link to your project if needed
+  railway run npm run seed:account
+  ```
 
 **API Authentication Errors:**
-- Verify `NEXT_PUBLIC_API_ACCOUNT_SID` and `NEXT_PUBLIC_API_KEY` match the seeded values
-- Check that the account was seeded in the backend
+- Verify `NEXT_PUBLIC_API_ACCOUNT_SID` and `NEXT_PUBLIC_API_KEY` in Vercel match the seeded values exactly
+- Check for extra whitespace in environment variables
+- Ensure account was seeded AFTER database was provisioned
+- Verify API key is active: Check `isActive: true` in the database
 
 ## 🔄 Continuous Deployment
 

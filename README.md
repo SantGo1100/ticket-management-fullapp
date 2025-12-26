@@ -25,7 +25,8 @@ The system implements a clean separation between frontend and backend, with a RE
 ### Backend
 - **Framework**: NestJS 10
 - **Language**: TypeScript
-- **Database**: SQLite with TypeORM
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **ORM**: TypeORM
 - **Authentication**: Account SID + API Key (bcrypt hashed)
 - **Documentation**: Swagger/OpenAPI
 - **Validation**: class-validator, class-transformer
@@ -46,8 +47,10 @@ The system implements a clean separation between frontend and backend, with a RE
 
 ### Topic Management (Admin)
 - Create, edit, enable/disable, and delete topics
+- Database-driven topics (not hardcoded enums)
 - Confirmation dialog with type-to-confirm for deletions
-- Topics persist across sessions via localStorage
+- Topics persist in database and sync across sessions
+- Graceful handling of deleted topics (preserves topic names in existing tickets)
 
 ### User Experience
 - Modern, responsive UI with dark mode support
@@ -126,17 +129,18 @@ Default test credentials are created via the seed script. See `INTEGRATION_SETUP
 - Frontend runs on port 3001 (configurable via package.json scripts)
 - CORS is configured to allow frontend-backend communication
 - Database schema auto-synchronizes in development mode
-- Topics are currently managed in frontend (localStorage) - backend integration can be added
+- Topics are database-driven with full CRUD API support
+- Production deployment: See [DEPLOYMENT.md](./DEPLOYMENT.md) for Railway (backend) and Vercel (frontend) setup
 
 ## 🎯 Future Enhancements
 
-Potential improvements for production deployment:
-- Backend API for topic management
-- User authentication system
+Potential improvements:
+- User authentication system (OAuth, JWT)
 - Real-time updates via WebSockets
 - Advanced filtering and search
 - Ticket assignment notifications
 - Reporting and analytics dashboard
+- Email notifications for ticket updates
 
 ## 📄 License
 

@@ -161,6 +161,12 @@ If you see CORS errors, ensure:
 2. Both services are running
 3. Environment variables are set correctly
 
+**For Production Deployment:**
+- Ensure `FRONTEND_URL` in Railway matches your Vercel production domain exactly
+- Check browser Network tab to see the exact `Origin` header being sent
+- Vercel provides multiple URLs; use the production domain (not preview URLs)
+- See [DEPLOYMENT.md](../DEPLOYMENT.md) for detailed CORS troubleshooting
+
 ### Authentication Errors
 If API calls fail with 401 errors:
 1. Verify the account SID and API key in `.env.local`
